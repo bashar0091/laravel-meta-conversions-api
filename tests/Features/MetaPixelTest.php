@@ -1,0 +1,313 @@
+<?php
+
+use Combindma\FacebookPixel\EventLayer;
+use Combindma\FacebookPixel\MetaPixel;
+use Combindma\FacebookPixel\Tests\Models\User;
+use FacebookAds\Object\ServerSide\CustomData;
+use FacebookAds\Object\ServerSide\EventResponse;
+use FacebookAds\Object\ServerSide\UserData;
+use Illuminate\Support\Facades\Auth;
+
+it('can test if config file are set', function () {
+    $this->assertEquals('pixel_id', $this->metaPixel->pixelId());
+    $this->assertEquals('session_key', $this->metaPixel->sessionKey());
+    $this->assertTrue($this->metaPixel->isEnabled());
+    $this->assertTrue($this->metaPixel->isAdvancedMatchingEnabled());
+});
+
+it('can set and retrieve pixel id', function () {
+    $this->metaPixel->setPixelId(123456);
+    expect($this->metaPixel->pixelId())->toBe('123456');
+});
+
+it('can set and retrieve pixel token', function () {
+    $this->metaPixel->setToken('123456ABCDEF');
+    expect($this->metaPixel->token())->toBe('123456ABCDEF');
+});
+
+it('can set and check if pixel test enabled', function () {
+    $this->metaPixel->setTestEventCode('TEST12345');
+    expect($this->metaPixel->testEnabled())->toBe(true);
+});
+
+it('can retrieve session key', function () {
+    $sessionKey = config('meta-pixel.session_key');
+    expect($this->metaPixel->sessionKey())->toBe($sessionKey);
+});
+
+it('can retrieve token', function () {
+    $token = config('meta-pixel.token');
+    expect($this->metaPixel->token())->toBe($token);
+});
+
+it('can enable and disable pixel on the fly', function () {
+    $this->metaPixel->enable();
+    expect($this->metaPixel->isEnabled())->toBeTrue();
+    $this->metaPixel->disable();
+    expect($this->metaPixel->isEnabled())->toBeFalse();
+});
+
+it('can track events', function () {
+    $this->metaPixel->track('TestEvent', ['param1' => 'value1']);
+    $eventLayer = $this->metaPixel->getEventLayer();
+    expect($eventLayer)->toBeInstanceOf(EventLayer::class)
+        ->and($eventLayer->toArray())->toBe([
+            [
+                'event_name' => 'TestEvent',
+                'data' => ['param1' => 'value1'],
+                'event_id' => null,
+            ],
+        ]);
+});
+
+it('can track events with event id', function () {
+    $this->metaPixel->track('TestEvent', ['param1' => 'value1'], 'event-id');
+    $eventLayer = $this->metaPixel->getEventLayer();
+    expect($eventLayer)->toBeInstanceOf(EventLayer::class)
+        ->and($eventLayer->toArray())->toBe([
+            [
+                'event_name' => 'TestEvent',
+                'data' => ['param1' => 'value1'],
+                'event_id' => 'event-id',
+            ],
+        ]);
+});
+
+it('can track custom events', function () {
+    $this->metaPixel->trackCustom('CustomEvent', ['customParam' => 'customValue']);
+    $customEventLayer = $this->metaPixel->getCustomEventLayer();
+    expect($customEventLayer)->toBeInstanceOf(EventLayer::class)
+        ->and($customEventLayer->toArray())->toBe([
+            [
+                'event_name' => 'CustomEvent',
+                'data' => ['customParam' => 'customValue'],
+                'event_id' => null,
+            ],
+        ]);
+});
+
+it('can track custom events with event id', function () {
+    $this->metaPixel->trackCustom('CustomEvent', ['customParam' => 'customValue'], 'event-id');
+    $customEventLayer = $this->metaPixel->getCustomEventLayer();
+    expect($customEventLayer)->toBeInstanceOf(EventLayer::class)
+        ->and($customEventLayer->toArray())->toBe([
+            [
+                'event_name' => 'CustomEvent',
+                'data' => ['customParam' => 'customValue'],
+                'event_id' => 'event-id',
+            ],
+        ]);
+});
+
+it('can flash events for the next request', function () {
+    $this->metaPixel->flashEvent('FlashEvent', ['flashParam' => 'flashValue']);
+    $flashedEvent = $this->metaPixel->getFlashedEvent();
+    expect($flashedEvent)->toBe([
+        [
+            'event_name' => 'FlashEvent',
+            'data' => ['flashParam' => 'flashValue'],
+            'event_id' => null,
+        ],
+    ]);
+});
+
+it('can flash events for the next request with event id', function () {
+    $this->metaPixel->flashEvent('FlashEvent', ['flashParam' => 'flashValue'], 'event-id');
+    $flashedEvent = $this->metaPixel->getFlashedEvent();
+    expect($flashedEvent)->toBe([
+        [
+            'event_name' => 'FlashEvent',
+            'data' => ['flashParam' => 'flashValue'],
+            'event_id' => 'event-id',
+        ],
+    ]);
+});
+
+it('can merge event session data', function () {
+    $eventSession = [['event_name' => 'MergedEvent', 'data' => ['mergedParam' => 'mergedValue'], 'event_id' => null]];
+    $this->metaPixel->merge($eventSession);
+    $eventLayer = $this->metaPixel->getEventLayer();
+    expect($eventLayer->toArray())->toBe($eventSession);
+});
+
+it('can track multiple events with the same name during the same request', function () {
+    $this->metaPixel->track('Purchase', ['value' => 30], 'purchase-1');
+    $this->metaPixel->track('Purchase', ['value' => 40], 'purchase-2');
+
+    expect($this->metaPixel->getEventLayer()->toArray())->toBe([
+        [
+            'event_name' => 'Purchase',
+            'data' => ['value' => 30],
+            'event_id' => 'purchase-1',
+        ],
+        [
+            'event_name' => 'Purchase',
+            'data' => ['value' => 40],
+            'event_id' => 'purchase-2',
+        ],
+    ]);
+});
+
+it('can clear the event layer', function () {
+    $this->metaPixel->track('TestEvent', ['param1' => 'value1']);
+    $this->metaPixel->clear();
+    $eventLayer = $this->metaPixel->getEventLayer();
+    expect($eventLayer->toArray())->toBeEmpty();
+});
+
+it('can retrieve user data for advanced matching', function () {
+    $user = new User(['id' => 12345, 'email' => 'test@example.com']);
+
+    Auth::shouldReceive('check')
+        ->once()
+        ->andReturn(true);
+    Auth::shouldReceive('user')
+        ->once()
+        ->andReturn($user);
+
+    expect($this->metaPixel->getUser())->toBe([
+        'em' => 'test@example.com',
+        'external_id' => '12345',
+    ]);
+});
+
+it('returns null when advanced matching is disabled', function () {
+    config()->set('meta-pixel.advanced_matching_enabled', false);
+    $this->metaPixel = new MetaPixel;
+
+    Auth::shouldReceive('check')->never();
+
+    expect($this->metaPixel->getUser())->toBeNull();
+});
+
+it('returns null when no user is authenticated for getUser', function () {
+    Auth::shouldReceive('check')
+        ->once()
+        ->andReturn(false);
+
+    expect($this->metaPixel->getUser())->toBeNull();
+});
+
+it('send method returns null when pixel is disabled', function () {
+    $this->metaPixel->disable();
+
+    $eventName = 'TestEvent';
+    $eventId = 'EVENT_ID';
+    $userData = new UserData;
+    $customData = new CustomData;
+
+    expect($this->metaPixel->send($eventName, $eventId, $customData, $userData))->toBeNull();
+});
+
+it('throws an exception when token is not set', function () {
+    $this->metaPixel->setToken('');
+
+    $eventName = 'TestEvent';
+    $eventId = 'EVENT_ID';
+    $customData = new CustomData;
+
+    expect(fn () => $this->metaPixel->send($eventName, $eventId, $customData))->toThrow(Exception::class);
+});
+
+it('can track and send with the same explicit event id', function () {
+    $customData = new CustomData;
+    $userData = new UserData;
+    $eventResponse = Mockery::mock(EventResponse::class);
+
+    $metaPixel = new class($eventResponse) extends MetaPixel
+    {
+        public array $trackedCalls = [];
+
+        public array $sentCalls = [];
+
+        public function __construct(public ?EventResponse $responseToReturn = null)
+        {
+            parent::__construct();
+        }
+
+        public function track(string $eventName, array $parameters = [], ?string $eventId = null): void
+        {
+            $this->trackedCalls[] = compact('eventName', 'parameters', 'eventId');
+        }
+
+        public function send(string $eventName, string $eventID, CustomData $customData, ?UserData $userData = null): ?EventResponse
+        {
+            $this->sentCalls[] = compact('eventName', 'eventID', 'customData', 'userData');
+
+            return $this->responseToReturn;
+        }
+    };
+
+    expect($metaPixel->trackAndSend(
+        'Purchase',
+        ['currency' => 'USD', 'value' => 30.0],
+        $customData,
+        $userData,
+        'purchase-123',
+    ))->toBe($eventResponse)
+        ->and($metaPixel->trackedCalls)->toBe([
+            [
+                'eventName' => 'Purchase',
+                'parameters' => ['currency' => 'USD', 'value' => 30.0],
+                'eventId' => 'purchase-123',
+            ],
+        ])
+        ->and($metaPixel->sentCalls)->toBe([
+            [
+                'eventName' => 'Purchase',
+                'eventID' => 'purchase-123',
+                'customData' => $customData,
+                'userData' => $userData,
+            ],
+        ]);
+});
+
+it('can track and send with an automatically generated event id', function () {
+    $customData = new CustomData;
+
+    $metaPixel = new class extends MetaPixel
+    {
+        public array $trackedCalls = [];
+
+        public array $sentCalls = [];
+
+        public function __construct()
+        {
+            parent::__construct();
+        }
+
+        public function track(string $eventName, array $parameters = [], ?string $eventId = null): void
+        {
+            $this->trackedCalls[] = compact('eventName', 'parameters', 'eventId');
+        }
+
+        public function send(string $eventName, string $eventID, CustomData $customData, ?UserData $userData = null): ?EventResponse
+        {
+            $this->sentCalls[] = compact('eventName', 'eventID', 'customData', 'userData');
+
+            return null;
+        }
+
+        protected function generateEventId(): string
+        {
+            return 'generated-event-id';
+        }
+    };
+
+    expect($metaPixel->trackAndSend('Purchase', ['currency' => 'USD'], $customData))->toBeNull()
+        ->and($metaPixel->trackedCalls)->toBe([
+            [
+                'eventName' => 'Purchase',
+                'parameters' => ['currency' => 'USD'],
+                'eventId' => 'generated-event-id',
+            ],
+        ])
+        ->and($metaPixel->sentCalls)->toBe([
+            [
+                'eventName' => 'Purchase',
+                'eventID' => 'generated-event-id',
+                'customData' => $customData,
+                'userData' => null,
+            ],
+        ]);
+});

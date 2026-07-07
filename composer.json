@@ -1,0 +1,73 @@
+{
+    "name": "combindma/laravel-facebook-pixel",
+    "description": "Meta pixel integration for Laravel",
+    "keywords": [
+        "combindma",
+        "meta-pixel",
+        "laravel"
+    ],
+    "homepage": "https://github.com/combindma/laravel-facebook-pixel",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Combind",
+            "email": "webmaster@combind.ma",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "facebook/php-business-sdk": "^25.0",
+        "illuminate/contracts": "^11.0|^12.0|^13.0",
+        "spatie/laravel-package-tools": "^1.11"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/boost": "^2.3",
+        "laravel/pint": "^1.0",
+        "nunomaduro/collision": "^7.0|^8.0",
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-arch": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "phpstan/extension-installer": "^1.1",
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Combindma\\FacebookPixel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Combindma\\FacebookPixel\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": "@php ./vendor/bin/testbench package:discover --ansi",
+        "analyse": "vendor/bin/phpstan analyse",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "format": "vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Combindma\\FacebookPixel\\FacebookPixelServiceProvider"
+            ],
+            "aliases": {
+                "MetaPixel": "Combindma\\FacebookPixel\\Facades\\MetaPixel"
+            }
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
