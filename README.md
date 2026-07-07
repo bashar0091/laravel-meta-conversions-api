@@ -1,7 +1,6 @@
 # Meta Pixel & Conversions API for Laravel
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/combindma/laravel-facebook-pixel.svg?style=flat-square)](https://packagist.org/packages/combindma/laravel-facebook-pixel)
-[![Total Downloads](https://img.shields.io/packagist/dt/combindma/laravel-facebook-pixel.svg?style=flat-square)](https://packagist.org/packages/combindma/laravel-facebook-pixel)
 [![License](https://img.shields.io/packagist/l/combindma/laravel-facebook-pixel.svg?style=flat-square)](LICENSE.md)
 
 A Laravel package for integrating **Meta Pixel (Facebook Pixel)** and the **Meta Conversions API (CAPI)** into your application.
